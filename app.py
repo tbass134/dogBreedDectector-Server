@@ -8,6 +8,7 @@ import requests
 import numpy as np
 
 from flask import Flask, request, jsonify
+import tensorflow as tf
 import pandas as pd
 import numpy as np
 from keras.models import load_model
@@ -20,13 +21,10 @@ num_classes = 120
 im_size = 299
 
 df = pd.read_csv('labels.csv')
-selected_breed_list = list(df.groupby('breed').count().sort_values(by='id', ascending=False).head(num_classes).index)
-
-breeds = pd.Series(df['breed'])
-print("total number of breeds to classify",len(breeds.unique()))
-sorted_breeds_list = sorted(selected_breed_list)
+sorted_breeds_list = sorted(list(df.groupby('breed').count().sort_values(by='id', ascending=False).head(num_classes).index))
 
 model = load_model('2018-11-15_dog_breed_model.h5')
+graph = tf.get_default_graph()
 
 def predict_from_image(img_path):
 
@@ -35,8 +33,10 @@ def predict_from_image(img_path):
     img_tensor = np.expand_dims(img_tensor, axis=0)         # (1, height, width, channels), add a dimension because the model expects this shape: (batch_size, height, width, channels)
     img_tensor /= 255.                                      # imshow expects values in the range [0, 1]
 
-    pred = model.predict(img_tensor)
-    predicted_class = sorted_breeds_list[np.argmax(pred)]
+    global graph
+    with graph.as_default():
+        pred = model.predict(img_tensor)
+        predicted_class = sorted_breeds_list[np.argmax(pred)]
 
     return predicted_class
 
@@ -63,9 +63,7 @@ def predict():
         return jsonify({'prediction': prediction})
 
     except Exception as e:
-
         return jsonify({'error': str(e), 'trace': traceback.format_exc()})
-
 
 def setup():
     return
